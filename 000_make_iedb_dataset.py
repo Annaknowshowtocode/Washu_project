@@ -1,7 +1,5 @@
-import numpy as np
 import pandas as pd
-from mhcgnomes import parse
-import mhcnames
+import mhcgnomes
 import os
 import dask.dataframe as dd
 
@@ -9,12 +7,11 @@ import dask.dataframe as dd
 # # 1 Read total data
 # ----------------------------------------
 
-DATA_PATH = '/Users/annaklimova/Desktop/Washu_project/data'
+DATA_PATH_BASE = '/Users/annaklimova/Desktop/Washu_project/data'
 EXPERIMENT_NAME = 'simple_model_enrichment'
-DATA_PATH_BASE = '/Users/annaklimova/Desktop/Washu_project/'
-DATA_PATH = f'{DATA_PATH_BASE}'
+DATA_PATH = f'{DATA_PATH_BASE}/'
 
-IEDB_DATA_PATH = DATA_PATH + 'data/mhc_ligand_full.csv'
+IEDB_DATA_PATH = DATA_PATH + 'mhc_ligand_full.csv'
 
 
 
@@ -318,10 +315,6 @@ ax.figure.suptitle('Dataset size for each Allele')
 # ----------------------------------------
 
 allele_name = "HLA-DRB1*0101"
-
-import mhcnames
-import mhcgnomes
-
 
 
 TARGET_PATH_TO_FILES = DATA_PATH + EXPERIMENT_NAME + '/'

@@ -13,7 +13,7 @@ import mhcgnomes
 # # 1. Read data
 # ----------------------------------------
 
-DATA_PATH_BASE = '/Users/annaklimova/Desktop/Washu_project/'
+DATA_PATH_BASE = '/Users/annaklimova/Desktop/Washu_project/data'
 EXPERIMENT_NAME = 'simple_model_enrichment'
 DATA_PATH = f'{DATA_PATH_BASE}/{EXPERIMENT_NAME}/'
 

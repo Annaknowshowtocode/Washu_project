@@ -1,13 +1,11 @@
 import itertools
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-
+import logomaker
 import pomegranate
 from logomaker.src import colors
-import logomaker
 from logomaker.src.Glyph import Glyph
 import networkx as nx
 from pyvis.network import Network
@@ -19,12 +17,38 @@ import colorcet as cc
 from sklearn.decomposition import PCA
 import umap
 from training_parameters import *
+from pathlib import Path
+
+def _sanitize_filename(filename: str) -> str:
+    """
+    Replace characters that are unsafe or treated as path separators
+    in filenames (/, \, *, :, ?, ", <, >, |) with underscores.
+    """
+    invalid_chars = '<>:"/\\|?*'
+    for ch in invalid_chars:
+        filename = filename.replace(ch, "_")
+    return filename
+
 
 def save_figure_to_svg(fig, dir, filename):
-    fig.savefig(dir + filename, format="svg", bbox_inches='tight', transparent=False)
-def save_figure_to_png(fig, dir, filename):
-    fig.savefig(dir + filename, format="png", bbox_inches='tight', transparent=False)
+    os.makedirs(dir, exist_ok=True)
+    fig.savefig(os.path.join(dir, filename), format="svg", bbox_inches='tight', transparent=False)
+    print(f"save_figure_to_svg: {filename} сохранен в {os.path.join(dir, filename)}")
 
+def save_figure_to_png(fig, dir, filename, dpi=200):
+    os.makedirs(dir, exist_ok=True)
+    fig.savefig(os.path.join(dir, filename), format="png", dpi=dpi, bbox_inches='tight', transparent=False)
+    print(f"save_figure_to_png: {filename} сохранен в {os.path.join(dir, filename)}")
+
+def save_figure(fig, dir, filename_without_ext, save_svg=True, save_png=True, dpi=200):
+    os.makedirs(dir, exist_ok=True)
+    if save_svg:
+        save_figure_to_svg(fig, dir, f"{filename_without_ext}.svg")
+    if save_png:
+        save_figure_to_png(fig, dir, f"{filename_without_ext}.png", dpi=dpi)
+
+
+# Функция берёт probability distribution по аминокислотам и превращает его в матрицу информационного содержания для одной позиции motif/logo.
 def probs_to_info_matrix(distribution):
     amino_acids = list(distribution.parameters[0].keys())
     dummy_df = pd.DataFrame(columns = sorted(amino_acids), index=[0],  dtype=float)
@@ -33,7 +57,6 @@ def probs_to_info_matrix(distribution):
     dummy_df.index.name = "pos"
     info_matrix = logomaker.transform_matrix(dummy_df, from_type='probability', to_type='information')
     return info_matrix
-
 
 
 def plot_aa_distr(model, distr, ax, horizontal, matrix_type, set_lim=False):
@@ -86,9 +109,7 @@ def plot_aa_distr(model, distr, ax, horizontal, matrix_type, set_lim=False):
                                  )
 
         max_info = np.max(info_matrix.values)
-        # print(max_info)
         ax.get_yaxis().get_major_formatter().set_useOffset(False)
-       # ax.ticklabel_format(useOffset=False)
         if max_info < 0.1:
             ax.ticklabel_format(useOffset=False)
         if set_lim:
@@ -107,7 +128,7 @@ def plot_distributions_for_states(model, TARGET_PATH_TO_RESULTS, horizontal=True
             if discrete:
                 if isinstance(state.distribution,  pomegranate.IndependentComponentsDistribution): #posiotion component case
                     list_of_dists = state.distribution.parameters[0]
-                    fig, axes = plt.subplots(ncols=1, nrows=len(list_of_dists), figsize=(5, 10),  height_ratios=[7, 3])
+                    fig, axes = plt.subplots(ncols=1, nrows=len(list_of_dists), figsize=(8, 14),  height_ratios=[13, 10])
                     aa_dist = list_of_dists[0].parameters[0]
                     aa_ax = axes[0]
                     plot_aa_distr(model=model, distr=aa_dist, ax=aa_ax, horizontal=horizontal, matrix_type=matrix_type, set_lim=True)
@@ -117,17 +138,17 @@ def plot_distributions_for_states(model, TARGET_PATH_TO_RESULTS, horizontal=True
                     save_figure_to_svg(fig, dir=PATH_TO_SAVE_PICTURES, filename=f"{state.name}.svg")
                     plt.close(fig)
                 else: # simple discrete distribution case
-                
-                    fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(5, 3))
+
+                    fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(7, 9))
                     distr = state.distribution.parameters[0]
                     plot_aa_distr(model, distr, ax, horizontal, matrix_type)
-                
-                
+
+
                     save_figure_to_svg(fig, dir=PATH_TO_SAVE_PICTURES, filename=f"{state.name}.svg")
                     plt.close(fig)
-                
-                
-                
+
+
+
             elif type(state.distribution) is pomegranate.IndependentComponentsDistribution:
                 list_of_dists = state.distribution.parameters[0]
 
@@ -154,7 +175,7 @@ def plot_distributions_for_states(model, TARGET_PATH_TO_RESULTS, horizontal=True
                         axes[i].plot(x, y2, 'r', lw=2, label=f'pdf_initial')
                     axes[i].text(0.0, 0.75, f'{np.round(mean_value,3)}', fontsize=35, transform=axes[i].transAxes)
                     axes[i].text(0.7, 0.75, f'{np.round(std_value,3)}', fontsize=35, transform=axes[i].transAxes)
-                save_figure_to_svg(fig, dir=PATH_TO_SAVE_PICTURES, filename=f"{state.name}.svg")
+                save_figure_to_svg(fig, dir=PATH_TO_SAVE_PICTURES, filename=f"{state.name}")
                 plt.close(fig)
             else:
                 # normal distr here
@@ -165,7 +186,7 @@ def plot_distributions_for_states(model, TARGET_PATH_TO_RESULTS, horizontal=True
                 x = np.linspace(mean_value-4*std_value, mean_value+4*std_value, 1000)
                 y = norm.pdf(x, loc=mean_value, scale=std_value)
                 ax.plot(x, y, 'r', lw=2, label='pdf')
-                save_figure_to_svg(fig, dir=PATH_TO_SAVE_PICTURES, filename=f"{state.name}.svg")
+                save_figure_to_svg(fig, dir=PATH_TO_SAVE_PICTURES, filename=f"{state.name}")
                 plt.close(fig)
 
 
@@ -278,9 +299,57 @@ def make_levels(model, precision=4):
                                 name_to_level[node_to.name] = cur_level
                                 #print(cur_node.name, "->", node_to.name, p,  cur_level )
                             nodes_stack.append(node_to)
-    # Add rest with 
+    # Add rest with
 
     return name_to_level
+
+
+def make_pyviz_graph(model, TARGET_PATH_TO_RESULTS, precision=4, prefefined_hierarchical_layout=True):
+    graph, name_to_level = convert_graph_to_good_format(model, logo_pictures_path = f"../{_sanitize_filename(model.name)}/", precision=precision)
+
+
+    nt = Network('500px', '1600', directed=True)
+    if pyvis._version.__version__ > '0.1.9':
+        # Bug in pyvis
+        nt.from_nx(graph, show_edge_weights=True)
+    else:
+        nt.from_nx(graph)
+        # nt.show_buttons()
+        # nt.show_buttons(filter_=['physics'])
+    if prefefined_hierarchical_layout:
+        nt.set_options(
+            """
+            var options = {
+                "configure": {
+                "enabled": true
+            },
+                "layout": {
+                "hierarchical": {
+                    "enabled": true,
+                    "direction": "LR"
+                }
+            },
+            "physics": {
+              "hierarchicalRepulsion": {
+                "centralGravity": 0
+              },
+              "minVelocity": 0.75,
+              "solver": "hierarchicalRepulsion"
+        }
+    }
+    """)
+    else:
+        nt.show_buttons()
+
+    path_to_save_html = f"{TARGET_PATH_TO_RESULTS}/result_html_files"
+    if not os.path.exists(path_to_save_html):
+        os.makedirs(path_to_save_html)
+
+
+    nt.save_graph(f"{path_to_save_html}/{model.name}-{precision}.html")
+    print(f"make_pyviz_graph: {model.name}-{precision}.html сохранен в {path_to_save_html}/{model.name}-{precision}.html")
+    # nt.show(f"{TARGET_PATH_TO_RESULTS}\\{model.name}\\pyviz.html")
+    return nt
 
 def convert_graph_to_good_format(model, logo_pictures_path, use_logos=True, precision = 4, edge_value="probability"):
     #print(f"Converting graph for model ({model.name}) (Delete zero edges)")
@@ -320,7 +389,7 @@ def convert_graph_to_good_format(model, logo_pictures_path, use_logos=True, prec
             # print(f"State", state.name,"Size", size_percentage)
             gr.add_node(state.name,
                         level=name_to_level[state.name],
-                        size=size_percentage * 35,
+                        size=size_percentage * 35 * 1.8,
                         shape='image',
                         #image=f"file:///{logo_pictures_path}{state.name}.svg")
                         image=f"{logo_pictures_path}{state.name}.svg")
@@ -338,54 +407,6 @@ def convert_graph_to_good_format(model, logo_pictures_path, use_logos=True, prec
                 gr.add_edge(edge[0].name, edge[1].name, label=log_probability)
 
     return gr, name_to_level
-
-
-def make_pyviz_graph(model, TARGET_PATH_TO_RESULTS, precision=4, prefefined_hierarchical_layout=True):
-    graph, name_to_level = convert_graph_to_good_format(model, f"../{model.name}/", precision=precision)
-                                                      # f"{os.getcwd()}/{TARGET_PATH_TO_RESULTS}/{model.name}/")
-
-    nt = Network('500px', '1600', directed=True)
-    if pyvis._version.__version__ > '0.1.9':
-        #Bug in pyvis
-        nt.from_nx(graph, show_edge_weights=True)
-    else:
-        nt.from_nx(graph)
-    #nt.show_buttons()
-    #nt.show_buttons(filter_=['physics'])
-    if prefefined_hierarchical_layout:
-        nt.set_options(
-    """
-    var options = {
-        "configure": {
-        "enabled": true
-    },
-      "layout": {
-        "hierarchical": {
-          "enabled": true,
-          "direction": "LR"
-        }
-      },
-      "physics": {
-        "hierarchicalRepulsion": {
-          "centralGravity": 0
-        },
-        "minVelocity": 0.75,
-        "solver": "hierarchicalRepulsion"
-      }
-    }
-    """)
-    else:
-        nt.show_buttons()
-
-
-    path_to_save_html = f"{TARGET_PATH_TO_RESULTS}/result_html_files"
-    if not os.path.exists(path_to_save_html):
-        os.makedirs(path_to_save_html)
-
-
-    nt.save_graph(f"{path_to_save_html}/{model.name}-{precision}.html")
-    # nt.show(f"{TARGET_PATH_TO_RESULTS}\\{model.name}\\pyviz.html")
-    return nt
 
 
 def make_logos_for_train_sequences(target_length, per_allele_per_kfold_per_length_training_data, TARGET_PATH_TO_RESULTS):
@@ -421,52 +442,157 @@ def plot_all_scores_as_lines(per_allele_data_df, per_name_models):
         for i in range(len(per_name_models)):
             sns.lineplot(x=df.index, y=df[f'model_{i}'].median(), ax=ax, linestyle='dashed', linewidth=2,
                          color=palette_lines[i])
+        return target_df
 
-def plot_all_scores_as_separate_lines(per_allele_data_df, per_name_models):
-    palette = sns.color_palette(cc.glasbey, n_colors=len(per_name_models))
-    palette_lines = sns.color_palette(cc.linear_blue_95_50_c20, n_colors=len(per_name_models))
+
+def plot_all_scores_as_separate_lines(per_allele_data_df, per_name_models, output_dir):
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # фиксируем порядок моделей
+    real_model_names = list(per_name_models.keys())
+    short_model_names = [f"model_{i}" for i in range(len(real_model_names))]
+
+    # сохраняем отдельный файл: буквально два столбца
+    model_name_mapping = pd.DataFrame({
+        "model": short_model_names,
+        "real_model_name": real_model_names
+    })
+    model_name_mapping.to_csv(output_dir / "model_name_mapping.csv", index=False)
+
+    palette = sns.color_palette(cc.glasbey, n_colors=len(real_model_names))
+    palette_lines = sns.color_palette(cc.linear_blue_95_50_c20, n_colors=len(real_model_names))
+
     for allele_name in per_allele_data_df.keys():
-        target_df = per_allele_data_df[allele_name].melt(id_vars=['peptide'], value_vars=[f'model_{i}' for i in range(len(per_name_models))],
-                            value_name='score', var_name='model', ignore_index=True)
-        ax = sns.lineplot(target_df,
-                          x=target_df.index,
-                          y=f'score',
-                          hue='model',
-                          palette=palette)
-        for i in range(len(per_name_models)):
-            median_df = target_df[target_df.model == f'model_{i}']
-            sns.lineplot(x=median_df.index, y=median_df[f'score'].median(), ax=ax, linestyle='dashed', linewidth=2,
-                         color=palette_lines[i])
+        target_df = per_allele_data_df[allele_name].melt(
+            id_vars=["peptide"],
+            value_vars=short_model_names,
+            value_name="score",
+            var_name="model",
+            ignore_index=True
+        )
+
+        ax = sns.lineplot(
+            data=target_df,
+            x=target_df.index,
+            y="score",
+            hue="model",
+            palette=palette
+        )
+
+        for i in range(len(real_model_names)):
+            median_df = target_df[target_df.model == f"model_{i}"]
+            sns.lineplot(
+                x=median_df.index,
+                y=[median_df["score"].median()] * len(median_df),
+                ax=ax,
+                linestyle="dashed",
+                linewidth=2,
+                color=palette_lines[i]
+            )
 
         sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
 
-def plot_split_diagnostics(per_allele_data_df, ann_df):
+    return model_name_mapping
+        
+def plot_split_diagnostics(
+    per_allele_data_df,
+    ann_df,
+    layer_counter=None,
+    save_dir="/Users/annaklimova/Desktop/Washu_project/simple_model_enrichment/IEDB_data/plots",
+):
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok=True)
+
+    ann_map = ann_df[0]  # dict[real_allele] -> df
+
+    # Собираем все таблицы и, если нужно, добавляем allele из ключа словаря
+    ann_frames = []
+    for real_allele, df in ann_map.items():
+        df = df.copy()
+        if "source_allele" not in df.columns and "allele" not in df.columns:
+            df["allele"] = real_allele
+        ann_frames.append(df)
+
+    ann_all = pd.concat(ann_frames, ignore_index=True)
+
+    if "split" in ann_all.columns:
+        ann_all = ann_all[ann_all["split"] == 0].copy()
+        print("this method supports 1 split for now")
+
+    # Определяем, какую колонку использовать как имя аллеля
+    if "source_allele" in ann_all.columns:
+        allele_col = "source_allele"
+    elif "allele" in ann_all.columns:
+        allele_col = "allele"
+    else:
+        raise KeyError("Neither 'source_allele' nor 'allele' found in annotation dataframe")
+
+    ann_all = ann_all[["peptide", allele_col]].drop_duplicates(subset=["peptide"])
+    ann_all = ann_all.rename(columns={allele_col: "allele"})
+    ann_all["peptide"] = ann_all["peptide"].astype(str)
+
+    results = {}
     for allele_name in per_allele_data_df.keys():
-        df = per_allele_data_df[allele_name]
+        print(f"allele_name {allele_name}")
+
+        df = per_allele_data_df[allele_name].copy()
+
+        if "peptide" not in df.columns:
+            df["peptide"] = df.index.astype(str)
+        else:
+            df["peptide"] = df["peptide"].astype(str)
+
         target_df = df[[col for col in df.columns if col.startswith("model")]]
 
-        g =  sns.clustermap(target_df)
-        ax = g.ax_heatmap
-        ax.set_title(f"Summary of {len(df.columns)} models")
+        annotated_df = df.join(
+            ann_all.set_index("peptide"),
+            on="peptide",
+            how="left",
+        )
+        annotated_df["allele"] = annotated_df["allele"].fillna("Unknown")
+
+        g = sns.clustermap(target_df)
+        ax_hm = g.ax_heatmap
+        ax_hm.set_title(f"Summary of {len(target_df.columns)} models")
         g.fig.set_size_inches(20, 10)
         g.fig.subplots_adjust(right=0.5)
+
         ax = g.fig.add_axes([0.55, 0.05, 0.42, 0.92])
-        pca = PCA(n_components=2)
-        pca_result = pca.fit_transform(target_df.values)
-        ann_df = ann_df[0][allele_name]
-        ann_df = ann_df[ann_df.split == 0]
-        print("this method supports 1 split for now")
-        ann_df = ann_df[['peptide', 'allele']]
-        annotated_df = df.merge(ann_df, on='peptide', how='left', validate='1:1')
-        to_plot = pd.DataFrame({"x": pca_result[:, 0], "y": pca_result[:, 1], "allele":annotated_df.allele.values})
-        #sns.jointplot(to_plot, x="x", y="y", hue="allele", kind='kde').fig.suptitle(f"PCA of df for {len(df.columns)} models")
+
         fit = umap.UMAP()
         u = fit.fit_transform(target_df.values)
-        to_plot = pd.DataFrame({"x": u[:, 0], "y": u[:, 1], "allele": annotated_df.allele.values, "peptide": annotated_df.peptide.values})
-        p = sns.kdeplot(to_plot, x="x", y="y", hue='allele', ax=ax)
-        ax.set_title(f"UMAP of df for {len(df.columns)} models")
-        return to_plot, g.fig
 
+        to_plot = pd.DataFrame({
+            "x": u[:, 0],
+            "y": u[:, 1],
+            "allele": annotated_df["allele"].values,
+            "peptide": annotated_df["peptide"].values,
+        })
+
+        sns.kdeplot(data=to_plot, x="x", y="y", hue="allele", ax=ax)
+        ax.set_title(f"UMAP of df for {len(target_df.columns)} models")
+
+        if save_dir is not None:
+            prefix = f"layer_{layer_counter}_" if layer_counter is not None else ""
+            fig_path = os.path.join(save_dir, f"{prefix}{allele_name}_clustermap_umap.png")
+            g.fig.savefig(fig_path, dpi=300, bbox_inches="tight")
+
+            target_path = os.path.join(save_dir, f"{prefix}{allele_name}_features_matrix.csv")
+            target_to_save = target_df.copy()
+            target_to_save.insert(0, "peptide", annotated_df["peptide"].values)
+            target_to_save.to_csv(target_path, index=True, index_label="index")
+
+            umap_path = os.path.join(save_dir, f"{prefix}{allele_name}_umap_points.csv")
+            to_plot.to_csv(umap_path, index=False)
+
+            print("Saved:", fig_path)
+            print("Saved:", target_path)
+            print("Saved:", umap_path)
+
+        results[allele_name] = (to_plot, g.fig)
+
+        return to_plot, g.fig     # return results
 
 def save_all_visualization_results(per_name_models,
                                    per_name_histories,
@@ -491,8 +617,13 @@ def save_all_visualization_results(per_name_models,
         print(i, end=' ')
         # with open(f"{TARGET_PATH_TO_RESULTS}{model.name}/state_graph.png", 'w+') as f:
         #     model.plot(file=f, crop_zero=False)
-        with open(f"{path_to_save_models}{model.name}/state_graph_cropped.png", 'w+') as f:
+
+        out_path = Path(path_to_save_models) / model.name / "state_graph_cropped.png"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(out_path, "wb") as f:
             model.plot(file=f, crop_zero=True)
+            print(f"save_all_visualization_results: {out_path.name} сохранен в {out_path}")
     print('\nDistributions')
     for i, model in enumerate(per_name_models.values()):
         print(i, end=' ')
@@ -506,44 +637,36 @@ def save_all_visualization_results(per_name_models,
         per_name_pyviz[name] = make_pyviz_graph(model, path_to_save_models, precision=3, prefefined_hierarchical_layout=predefined_hirerarchical_layout)
 
 
-
-
-def plot_info_matrices_to_file(info_matrix1, info_matrix2, folder_to_save, main_title, filename):
-    fig, axes = plt.subplots(ncols=1, nrows=2, figsize=(5, 6))
-    ww_logo = logomaker.Logo(info_matrix1, font_name='Liberation Sans Narrow', flip_below=True,
-                             ax=axes[0])
-    ww_logo.ax.set_title(f"branch 1")
-    ww_logo = logomaker.Logo(info_matrix2, font_name='Liberation Sans Narrow', flip_below=True,
-                             ax=axes[1])
-    ww_logo.ax.set_title(f"branch 2")
-    fig.suptitle(main_title)
-    plt.tight_layout()
-    save_figure_to_svg(fig, dir=folder_to_save, filename=f"{filename}.svg")
-    plt.close(fig)
-
-
-"""
-
-def statistics_for_letter(target_length, letter, positions):
-    per_allele_per_split_selected_peptides = dict()
-    for allele_name in ALLELES:
-        per_allele_per_split_selected_peptides[allele_name] = dict()
-        for split_num, per_length_data in per_allele_per_kfold_per_length_binders_train[allele_name].items():
-            binders_array = per_length_data[target_length]
-            selected_peptides = np.array([peptide for peptide in binders_array  for position in positions if peptide[position] == letter])
-            per_allele_per_split_selected_peptides[allele_name][split_num] = selected_peptides
-    return per_allele_per_split_selected_peptides
-
-statistics_L_0 = statistics_for_letter(8, 'L', [0])
-statistics_L_0_unique = {allele:{split: set(arr) for split, arr in statistics_L_0[allele].items()} for allele in ALLELES}
-statistics_L_1 = statistics_for_letter(8, 'L', [1])
-statistics_L_1_unique = {allele:{split: set(arr) for split, arr in statistics_L_1[allele].items()} for allele in ALLELES}
-
-print("L on a first position:", [len(arr) for arr in statistics_L_0[ALLELES[0]].values()], "Unique", [len(set(arr)) for arr in statistics_L_0_unique[ALLELES[0]].values()])
-print('\t', statistics_L_0[ALLELES[0]][0][:6])
-
-print("L on a second position:", [len(arr) for arr in statistics_L_1[ALLELES[0]].values()], "Unique", [len(set(arr)) for arr in statistics_L_1_unique[ALLELES[0]].values()])
-print('\t', statistics_L_1[ALLELES[0]][0][:6])
-print("L on both positions:", [len(np.intersect1d(arr1, arr2)) for arr1, arr2 in zip(statistics_L_0[ALLELES[0]].values(), statistics_L_1[ALLELES[0]].values())])
-print('\t',np.intersect1d(statistics_L_1[ALLELES[0]][0],statistics_L_0[ALLELES[0]][0])[:6])
-"""
+        
+        
+        # def plot_info_matrices_to_file(info_matrix1, info_matrix2, folder_to_save, main_title, filename):
+        #
+        #     fig, axes = plt.subplots(ncols=1, nrows=2, figsize=(5, 6))
+        #     ww_logo = logomaker.Logo(info_matrix1, font_name='Arial', flip_below=True,
+        #                              ax=axes[0])
+        #     ww_logo.ax.set_title(f"branch 1")
+        #     ww_logo = logomaker.Logo(info_matrix2, font_name='Arial', flip_below=True,
+        #                              ax=axes[1])
+        #     ww_logo.ax.set_title(f"branch 2")
+        #     fig.suptitle(main_title)
+        #     plt.tight_layout()
+        #     save_figure_to_svg(fig, dir=folder_to_save, filename=f"{filename}")
+        #     plt.close(fig)
+        
+        
+def plot_info_matrices_to_file(info_matrix1, info_matrix2, folder_to_save, allele_name, main_title, filename):
+            os.makedirs(folder_to_save, exist_ok=True)
+        
+            fig, axes = plt.subplots(ncols=1, nrows=2, figsize=(5, 6))
+        
+            ww_logo = logomaker.Logo(info_matrix1, font_name='Arial', flip_below=True, ax=axes[0])
+            ww_logo.ax.set_title("branch 1")
+        
+            ww_logo = logomaker.Logo(info_matrix2, font_name='Arial', flip_below=True, ax=axes[1])
+            ww_logo.ax.set_title("branch 2")
+        
+            fig.suptitle(main_title)
+            plt.tight_layout()
+        
+            save_figure_to_svg(fig, dir=folder_to_save, filename=filename)
+            plt.close(fig)
