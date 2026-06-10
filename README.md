@@ -18,10 +18,10 @@ training, motif recovery, and benchmarking.
 - [Installation](#installation)
 - [Expected data layout](#expected-data-layout)
 - [Pipeline](#pipeline)
-  - [`000_make_iedb_dataset.py` — IEDB preprocessing](#000_make_iedb_datasetpy--iedb-preprocessing)
-  - [`001_simulated_data..py` — synthetic data generation](#001_simulated_datapy--synthetic-data-generation)
-  - [`002_make_per_allele_per_length_split.py` — per-length / k-fold split](#002_make_per_allele_per_length_splitpy--per-length--k-fold-split)
-  - [`003_deconvolution_main.py` — hierarchical deconvolution](#003_deconvolution_mainpy--hierarchical-deconvolution)
+  - [`000_make_iedb_dataset.py` - IEDB preprocessing](#000_make_iedb_datasetpy--iedb-preprocessing)
+  - [`001_simulated_data..py` - synthetic data generation](#001_simulated_datapy--synthetic-data-generation)
+  - [`002_make_per_allele_per_length_split.py` - per-length / k-fold split](#002_make_per_allele_per_length_splitpy--per-length--k-fold-split)
+  - [`003_deconvolution_main.py` - hierarchical deconvolution](#003_deconvolution_mainpy--hierarchical-deconvolution)
 - [The `deconvolution_pipeline` package](#the-deconvolution_pipeline-package)
 - [Configuration](#configuration)
 - [Outputs](#outputs)
@@ -44,7 +44,7 @@ average distinct sub-motifs together and lose minor but biologically meaningful 
 
 This project implements a **hierarchical HMM** approach to that problem. Hidden Markov
 models naturally handle variable-length sequences and yield interpretable, position-specific
-emission distributions — well suited to modelling conserved anchor positions.
+emission distributions - well suited to modelling conserved anchor positions.
 
 ## Method overview
 
@@ -96,7 +96,7 @@ Washu_project/
 
 ## Installation
 
-> **Important — custom pomegranate fork required.**
+> **Important - custom pomegranate fork required.**
 > The code does **not** run on the standard PyPI `pomegranate`. It relies on a customized
 > version that adds `DiscreteDistributionAnchor` and `DiscreteDistributionCycle`, based on
 > the codebase at <https://github.com/artyomovlab/MHC_predictor>. Install that fork (and its
@@ -151,14 +151,14 @@ results/
 ## Pipeline
 
 Run the scripts in order. Steps 0 and 1 produce input data; step 2 prepares it for training;
-step 3 performs the deconvolution. (Steps 0–1 are independent — use step 0 for real IEDB
+step 3 performs the deconvolution. (Steps 0–1 are independent - use step 0 for real IEDB
 data and/or step 1 for controlled synthetic validation.)
 
-### `000_make_iedb_dataset.py` — IEDB preprocessing
+### `000_make_iedb_dataset.py` - IEDB preprocessing
 
 Builds clean, per-allele binder/non-binder tables from a raw IEDB export.
 
-- **Input:** `data/mhc_ligand_full.csv` — the full *MHC Ligand* export from the
+- **Input:** `data/mhc_ligand_full.csv` - the full *MHC Ligand* export from the
   [Immune Epitope Database](https://www.iedb.org/).
 - **What it does:** keeps linear peptides composed only of the 20 standard amino acids;
   removes selected assay types (following Sarkizova et al.); merges quantitative (nM) and
@@ -168,12 +168,12 @@ Builds clean, per-allele binder/non-binder tables from a raw IEDB export.
 - **Output:** one CSV per allele, `data/<experiment>/data#<compact_allele>.csv`
   (`;`-separated), plus a dataset-size bar plot.
 
-### `001_simulated_data..py` — synthetic data generation
+### `001_simulated_data..py` - synthetic data generation
 
 Generates peptide mixtures with a **fully controlled** motif structure, used to validate the
 method against a known ground truth.
 
-- **Input:** none — everything is parameterized in the script.
+- **Input:** none - everything is parameterized in the script.
 - **What it does:** for each of several built-in scenarios (`two_distinct_motifs`,
   `three_different_motifs`, `five_different_motifs`, `random_cores`, …) it builds peptides
   from a 9-residue core with motif-specific anchor positions plus random flanks. Core start
@@ -186,7 +186,7 @@ method against a known ground truth.
   plus sequence-logo PNGs under `logos/` for verification.
 - **Configure:** `CLASS_TO_GENERATE`, `scenario`, `DATA_PATH_BASE`, noise levels.
 
-### `002_make_per_allele_per_length_split.py` — per-length / k-fold split
+### `002_make_per_allele_per_length_split.py` - per-length / k-fold split
 
 Prepares preprocessed per-allele data for training.
 
@@ -197,7 +197,7 @@ Prepares preprocessed per-allele data for training.
 - **Output:** `data/<experiment>/per_length_per_kfold_split/<allele>#binders#train.csv`
   and `…#test.csv` (columns `peptide, length, split`), plus logos under `logos/`.
 
-### `003_deconvolution_main.py` — hierarchical deconvolution
+### `003_deconvolution_main.py` - hierarchical deconvolution
 
 The main driver that runs the full method.
 
@@ -213,7 +213,7 @@ The main driver that runs the full method.
   4. runs **hierarchical training** (`hierarchically_train_splited_models`, default
      `total_layers_to_do=3`) with background filtering, clustering-based
      splitting, and enrichment.
-- **Output:** under `results/<experiment>/<SUBFOLDER>/` — trained models, sequence logos
+- **Output:** under `results/<experiment>/<SUBFOLDER>/` - trained models, sequence logos
   per branch, peptide-by-model score-matrix heatmaps, PCA/UMAP projections, alignment
   examples (SVG), and metrics tables.
 - **Configure:** `SUBFOLDER`, `experiment_name`, `num_runs`, and `total_layers_to_do` /
@@ -266,12 +266,12 @@ HMM framework developed in:
 Kleverov D.A., Shalyto A.A., Artyomov M. A method for constructing interpretable
 hidden Markov models for the task of finding peptide binding sites in protein
 sequences. // Scientific and Technical Journal of Information Technologies, Mechanics
-and Optics. — 2023. — Vol. 23, No. 5. — P. 989–1000.
+and Optics. - 2023. - Vol. 23, No. 5. - P. 989–1000.
 
 Polezhaeva V.A., Kleverov D.A., Shalyto A.A., Artyomov M. Classification of peptide
 sequences using hidden Markov models that account for negative examples. //
-Scientific and Technical Journal of Information Technologies, Mechanics and Optics. —
-2025. — Vol. 25, No. 5. — P. 888–901.
+Scientific and Technical Journal of Information Technologies, Mechanics and Optics. -
+2025. - Vol. 25, No. 5. - P. 888–901.
 DOI: https://doi.org/10.17586/2226-1494-2025-25-5-888-901
 
 - Built on top of the HMM codebase at
